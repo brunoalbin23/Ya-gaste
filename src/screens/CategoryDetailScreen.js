@@ -10,12 +10,12 @@ import { formatARS } from '../utils/format';
 export default function CategoryDetailScreen({ route, navigation }) {
   const { catId } = route.params;
   const insets = useSafeAreaInsets();
-  const { data, stats, deleteExpense, openAddExpense } = useData();
+  const { gastos, stats, deleteExpense, openAddExpense } = useData();
   const cat = CATEGORY_BY_ID[catId];
 
   if (!cat) return null;
 
-  const items = data.gastos.filter(g => g.categoria === catId);
+  const items = gastos.filter(g => g.categoria === catId);
   const total = stats.byCat[catId]?.total || 0;
 
   return (

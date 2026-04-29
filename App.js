@@ -1,18 +1,20 @@
 import 'react-native-gesture-handler';
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
+import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { DataProvider } from './src/context/DataContext';
 import TabNavigator from './src/navigation/TabNavigator';
 import CategoryDetailScreen from './src/screens/CategoryDetailScreen';
 import AddExpenseSheet from './src/sheets/AddExpenseSheet';
 import AddIncomeSheet from './src/sheets/AddIncomeSheet';
 import NewCategorySheet from './src/sheets/NewCategorySheet';
+import AuthScreen from './src/screens/auth/AuthScreen';
 import { PALETTE } from './src/constants/theme';
 
 class ErrorBoundary extends React.Component {
@@ -22,7 +24,7 @@ class ErrorBoundary extends React.Component {
     if (this.state.error) {
       return (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#FBF6EE' }}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: '#2E2438', marginBottom: 8 }}>Error de renderizado</Text>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: '#2E2438', marginBottom: 8 }}>Error</Text>
           <Text style={{ fontSize: 12, color: '#666', textAlign: 'center' }}>{String(this.state.error)}</Text>
         </View>
       );
@@ -33,15 +35,36 @@ class ErrorBoundary extends React.Component {
 
 const Stack = createStackNavigator();
 
-function RootNavigator() {
+function MainApp() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Main" component={TabNavigator} />
-        <Stack.Screen name="CategoryDetail" component={CategoryDetailScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <DataProvider>
+      <View style={{ flex: 1, backgroundColor: PALETTE.bg }}>
+        <NavigationContainer>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Main" component={TabNavigator} />
+            <Stack.Screen name="CategoryDetail" component={CategoryDetailScreen} />
+          </Stack.Navigator>
+        </NavigationContainer>
+        <AddExpenseSheet />
+        <AddIncomeSheet />
+        <NewCategorySheet />
+      </View>
+    </DataProvider>
   );
+}
+
+function RootContent() {
+  const { session, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: PALETTE.bg, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={PALETTE.accent} size="large" />
+      </View>
+    );
+  }
+
+  return session ? <MainApp /> : <AuthScreen />;
 }
 
 export default function App() {
@@ -50,14 +73,9 @@ export default function App() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <StatusBar style="dark" />
-          <DataProvider>
-            <View style={{ flex: 1, backgroundColor: PALETTE.bg }}>
-              <RootNavigator />
-              <AddExpenseSheet />
-              <AddIncomeSheet />
-              <NewCategorySheet />
-            </View>
-          </DataProvider>
+          <AuthProvider>
+            <RootContent />
+          </AuthProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>

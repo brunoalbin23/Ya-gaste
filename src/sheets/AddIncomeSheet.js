@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable } from 'react-native';
+import { View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native';
 import { FONTS, PALETTE } from '../constants/theme';
 import { useData } from '../context/DataContext';
 import Sheet from '../components/Sheet';
 import { formatARS } from '../utils/format';
 
-const FUENTES = ['Sueldo', 'Freelance', 'Otros'];
-const FUENTE_META = {
+const TIPOS = ['Sueldo', 'Freelance', 'Otros'];
+const TIPO_META = {
   Sueldo:    { emoji: '💼', tint: '#E0F1F8' },
   Freelance: { emoji: '🧑‍💻', tint: '#FFEFD4' },
   Otros:     { emoji: '✨', tint: '#ECE6F6' },
@@ -25,36 +25,47 @@ function FormLabel({ children }) {
 
 export default function AddIncomeSheet() {
   const { showAddIncome, setShowAddIncome, addIncome } = useData();
-  const [form, setForm] = useState({ fuente: 'Sueldo', monto: '', nota: '' });
+  const [form, setForm] = useState({ tipo: 'Sueldo', monto: '', descripcion: '' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
 
   const canSave = parseInt((form.monto || '').replace(/[^\d]/g, ''), 10) > 0;
   const displayMonto = form.monto
     ? formatARS(parseInt(form.monto.replace(/[^\d]/g, ''), 10) || 0).replace('$', '')
     : '';
 
-  const handleClose = () => {
-    setForm({ fuente: 'Sueldo', monto: '', nota: '' });
+  function handleClose() {
+    setForm({ tipo: 'Sueldo', monto: '', descripcion: '' });
+    setError(null);
     setShowAddIncome(false);
-  };
+  }
 
-  const submit = () => {
+  async function submit() {
     const monto = parseInt((form.monto || '').replace(/[^\d]/g, ''), 10);
     if (!monto) return;
-    addIncome({ fuente: form.fuente, monto, nota: form.nota || form.fuente });
-    handleClose();
-  };
+    setSaving(true);
+    setError(null);
+    try {
+      await addIncome({ tipo: form.tipo, monto, descripcion: form.descripcion || form.tipo });
+      handleClose();
+    } catch (e) {
+      setError(e.message ?? 'Error al guardar');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <Sheet visible={showAddIncome} onClose={handleClose} title="Cargar ingreso">
       <FormLabel>Fuente</FormLabel>
       <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14 }}>
-        {FUENTES.map(f => {
-          const active = form.fuente === f;
-          const meta = FUENTE_META[f];
+        {TIPOS.map(t => {
+          const active = form.tipo === t;
+          const meta = TIPO_META[t];
           return (
             <Pressable
-              key={f}
-              onPress={() => setForm(s => ({ ...s, fuente: f }))}
+              key={t}
+              onPress={() => setForm(s => ({ ...s, tipo: t }))}
               style={{
                 flex: 1, paddingVertical: 12, paddingHorizontal: 6, borderRadius: 14,
                 backgroundColor: active ? meta.tint : PALETTE.card,
@@ -65,7 +76,7 @@ export default function AddIncomeSheet() {
               }}
             >
               <Text style={{ fontSize: 22 }}>{meta.emoji}</Text>
-              <Text style={{ fontSize: 12, fontWeight: '600', color: PALETTE.ink }}>{f}</Text>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: PALETTE.ink }}>{t}</Text>
             </Pressable>
           );
         })}
@@ -80,17 +91,17 @@ export default function AddIncomeSheet() {
         <TextInput
           keyboardType="numeric"
           value={displayMonto}
-          onChangeText={(v) => setForm(s => ({ ...s, monto: v.replace(/[^\d]/g, '') }))}
+          onChangeText={(v) => setForm(f => ({ ...f, monto: v.replace(/[^\d]/g, '') }))}
           placeholder="0"
           placeholderTextColor={PALETTE.muted}
           style={{ flex: 1, ...FONTS.display, fontSize: 28, color: PALETTE.ink }}
         />
       </View>
 
-      <FormLabel>Nota</FormLabel>
+      <FormLabel>Descripción</FormLabel>
       <TextInput
-        value={form.nota}
-        onChangeText={(v) => setForm(s => ({ ...s, nota: v }))}
+        value={form.descripcion}
+        onChangeText={(v) => setForm(s => ({ ...s, descripcion: v }))}
         placeholder="Ej: Empresa SA — abril"
         placeholderTextColor={PALETTE.muted}
         style={{
@@ -99,18 +110,23 @@ export default function AddIncomeSheet() {
         }}
       />
 
+      {error && (
+        <Text style={{ color: '#B03030', fontSize: 12, textAlign: 'center', marginBottom: 8 }}>{error}</Text>
+      )}
+
       <Pressable
         onPress={submit}
-        disabled={!canSave}
+        disabled={!canSave || saving}
         style={{
           height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
           backgroundColor: canSave ? '#1F3A2C' : 'rgba(46,36,56,0.2)',
-          marginBottom: 8,
+          marginBottom: 8, opacity: saving ? 0.6 : 1,
         }}
       >
-        <Text style={{ ...FONTS.display, fontWeight: '600', fontSize: 15, color: '#fff' }}>
-          Guardar ingreso
-        </Text>
+        {saving
+          ? <ActivityIndicator color="#fff" />
+          : <Text style={{ ...FONTS.display, fontWeight: '600', fontSize: 15, color: '#fff' }}>Guardar ingreso</Text>
+        }
       </Pressable>
     </Sheet>
   );

@@ -9,11 +9,11 @@ import { formatARS, relativeDate } from '../utils/format';
 
 export default function ExpensesScreen() {
   const insets = useSafeAreaInsets();
-  const { data, deleteExpense } = useData();
+  const { gastos, deleteExpense } = useData();
 
   const groups = useMemo(() => {
     const out = {};
-    for (const g of data.gastos) {
+    for (const g of gastos) {
       const d = new Date(g.fecha);
       const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
       if (!out[key]) out[key] = { label: relativeDate(g.fecha), items: [], total: 0 };
@@ -21,7 +21,7 @@ export default function ExpensesScreen() {
       out[key].total += g.monto;
     }
     return Object.values(out);
-  }, [data.gastos]);
+  }, [gastos]);
 
   return (
     <ScrollView

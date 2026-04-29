@@ -60,11 +60,22 @@ export default function AddExpenseSheet() {
     setShowAddExpense(false);
   };
 
-  const submit = () => {
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+
+  const submit = async () => {
     const monto = parseInt((form.monto || '').replace(/[^\d]/g, ''), 10);
     if (!monto || monto <= 0) return;
-    addExpense({ categoria: form.categoria, monto, descripcion: form.descripcion || 'Gasto' });
-    handleClose();
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await addExpense({ categoria: form.categoria, monto, descripcion: form.descripcion || 'Gasto' });
+      handleClose();
+    } catch (e) {
+      setSaveError(e.message ?? 'Error al guardar');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -189,18 +200,23 @@ export default function AddExpenseSheet() {
         })}
       </View>
 
+      {saveError && (
+        <Text style={{ color: '#B03030', fontSize: 12, textAlign: 'center', marginBottom: 8 }}>{saveError}</Text>
+      )}
+
       <Pressable
         onPress={submit}
-        disabled={!canSave}
+        disabled={!canSave || saving}
         style={{
           height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
           backgroundColor: canSave ? PALETTE.ink : 'rgba(46,36,56,0.2)',
-          marginBottom: 8,
+          marginBottom: 8, opacity: saving ? 0.6 : 1,
         }}
       >
-        <Text style={{ ...FONTS.display, fontWeight: '600', fontSize: 15, color: '#fff', letterSpacing: -0.2 }}>
-          Guardar gasto
-        </Text>
+        {saving
+          ? <ActivityIndicator color="#fff" />
+          : <Text style={{ ...FONTS.display, fontWeight: '600', fontSize: 15, color: '#fff', letterSpacing: -0.2 }}>Guardar gasto</Text>
+        }
       </Pressable>
     </Sheet>
   );

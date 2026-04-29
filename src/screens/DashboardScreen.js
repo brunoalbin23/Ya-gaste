@@ -27,8 +27,9 @@ function BalancePill({ label, value, positive }) {
 
 export default function DashboardScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { data, stats, setShowNewCat, openAddExpense } = useData();
+  const { gastos, stats, profile, setShowNewCat, openAddExpense } = useData();
   const monthName = new Date().toLocaleDateString('es-AR', { month: 'long' });
+  const firstName = profile?.nombre?.split(' ')[0] ?? 'vos';
 
   return (
     <ScrollView
@@ -43,7 +44,7 @@ export default function DashboardScreen({ navigation }) {
             {monthName}
           </Text>
           <Text style={{ ...FONTS.display, fontSize: 26, color: PALETTE.ink, letterSpacing: -0.5, marginTop: 2 }}>
-            Hola, Sofi 👋
+            Hola, {firstName} 👋
           </Text>
         </View>
       </View>
@@ -122,7 +123,7 @@ export default function DashboardScreen({ navigation }) {
         backgroundColor: PALETTE.card, borderRadius: 22, overflow: 'hidden',
         shadowColor: PALETTE.ink, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 3,
       }}>
-        {data.gastos.slice(0, 4).map((g, i, arr) => (
+        {gastos.slice(0, 4).map((g, i, arr) => (
           <ExpenseRow key={g.id} g={g} isLast={i === arr.length - 1} />
         ))}
       </View>

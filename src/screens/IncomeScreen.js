@@ -8,7 +8,7 @@ import { formatARS } from '../utils/format';
 
 export default function IncomeScreen() {
   const insets = useSafeAreaInsets();
-  const { data, stats, deleteIncome, setShowAddIncome } = useData();
+  const { ingresos, stats, deleteIncome, setShowAddIncome } = useData();
 
   return (
     <ScrollView
@@ -59,10 +59,10 @@ export default function IncomeScreen() {
         backgroundColor: PALETTE.card, borderRadius: 22, overflow: 'hidden',
         shadowColor: PALETTE.ink, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 3,
       }}>
-        {data.ingresos.map((i, idx, arr) => (
+        {ingresos.map((i, idx, arr) => (
           <IncomeRow key={i.id} i={i} isLast={idx === arr.length - 1} onDelete={() => deleteIncome(i.id)} />
         ))}
-        {data.ingresos.length === 0 && (
+        {ingresos.length === 0 && (
           <View style={{ padding: 32, alignItems: 'center' }}>
             <Text style={{ fontSize: 13, color: PALETTE.muted }}>Sin ingresos cargados todavía.</Text>
           </View>
