@@ -1,34 +1,38 @@
 import React from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, Alert } from 'react-native';
 import { FONTS, PALETTE } from '../constants/theme';
+import { useData } from '../context/DataContext';
 import { formatARS, relativeDate } from '../utils/format';
 
-const TIPO_META = {
-  Sueldo:    { emoji: '💼', tint: '#E0F1F8' },
-  Freelance: { emoji: '🧑‍💻', tint: '#FFEFD4' },
-  Otros:     { emoji: '✨', tint: '#ECE6F6' },
+// Fallback para registros legacy (Sueldo, Freelance)
+const TIPO_LEGACY = {
+  Sueldo:    { nombre: 'Trabajo',   emoji: '💼', tint: '#E0F1F8' },
+  Freelance: { nombre: 'Freelance', emoji: '🧑‍💻', tint: '#FFEFD4' },
 };
 
-function UserBadge({ nombre }) {
-  if (!nombre) return null;
-  return (
-    <View style={{
-      width: 18, height: 18, borderRadius: 9,
-      backgroundColor: '#B8E6C8',
-      alignItems: 'center', justifyContent: 'center',
-      position: 'absolute', bottom: -3, right: -3,
-      borderWidth: 1.5, borderColor: PALETTE.card,
-    }}>
-      <Text style={{ fontSize: 9, fontWeight: '700', color: '#1F3A2C' }}>
-        {nombre.charAt(0).toUpperCase()}
-      </Text>
-    </View>
-  );
-}
-
 export default function IncomeRow({ i, isLast, onDelete }) {
-  const meta = TIPO_META[i.tipo] ?? TIPO_META.Otros;
+  const { allIncomeTipos, profile: currentProfile, openEditIncome } = useData();
+
+  const tipoMeta = allIncomeTipos.find(t => t.id === i.tipo)
+    ?? TIPO_LEGACY[i.tipo]
+    ?? { nombre: i.tipo, emoji: '✨', tint: '#ECE6F6' };
+
   const autorNombre = i.profiles?.nombre ?? null;
+  const isCurrentUser = i.user_id === currentProfile?.user_id;
+  const displayName = autorNombre
+    ? (isCurrentUser ? 'Tu' : autorNombre)
+    : null;
+
+  function handleDelete() {
+    Alert.alert(
+      'Eliminar ingreso',
+      '¿Estás seguro que querés eliminar este ingreso?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Eliminar', style: 'destructive', onPress: onDelete },
+      ],
+    );
+  }
 
   return (
     <View style={{
@@ -37,29 +41,46 @@ export default function IncomeRow({ i, isLast, onDelete }) {
       borderBottomWidth: isLast ? 0 : 0.5,
       borderBottomColor: 'rgba(46,36,56,0.06)',
     }}>
-      <View style={{ position: 'relative' }}>
-        <View style={{
-          width: 40, height: 40, borderRadius: 13, backgroundColor: meta.tint,
-          alignItems: 'center', justifyContent: 'center',
-        }}>
-          <Text style={{ fontSize: 20 }}>{meta.emoji}</Text>
-        </View>
-        <UserBadge nombre={autorNombre} />
+      <View style={{
+        width: 40, height: 40, borderRadius: 13, backgroundColor: tipoMeta.tint,
+        alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      }}>
+        <Text style={{ fontSize: 20 }}>{tipoMeta.emoji}</Text>
       </View>
 
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ ...FONTS.bodySemiBold, fontSize: 14, color: PALETTE.ink }}>{i.tipo}</Text>
-        <Text numberOfLines={1} style={{ fontSize: 11, color: PALETTE.muted, marginTop: 2 }}>
-          {i.descripcion} · {relativeDate(i.fecha)}
-        </Text>
+        <Text style={{ ...FONTS.bodySemiBold, fontSize: 14, color: PALETTE.ink }}>{tipoMeta.nombre}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+          <Text numberOfLines={1} style={{ fontSize: 11, color: PALETTE.muted, flexShrink: 1 }}>
+            {i.descripcion} · {relativeDate(i.fecha)}
+          </Text>
+          {displayName && (
+            <>
+              <Text style={{ fontSize: 11, color: PALETTE.muted }}>·</Text>
+              <View style={{
+                flexDirection: 'row', alignItems: 'center',
+                backgroundColor: isCurrentUser ? '#B8E6C833' : 'rgba(46,36,56,0.08)',
+                borderRadius: 99, paddingHorizontal: 6, paddingVertical: 1,
+              }}>
+                <Text style={{ fontSize: 10, fontWeight: '600', color: '#1F3A2C' }}>
+                  {displayName}
+                </Text>
+              </View>
+            </>
+          )}
+        </View>
       </View>
 
-      <Text style={{ ...FONTS.display, fontSize: 15, color: '#2A6E47', letterSpacing: -0.2 }}>
+      <Text style={{ ...FONTS.display, fontSize: 15, color: '#2A6E47', letterSpacing: -0.2, flexShrink: 0 }}>
         +{formatARS(i.monto)}
       </Text>
 
+      <Pressable onPress={() => openEditIncome(i)} hitSlop={8} style={{ padding: 4 }}>
+        <Text style={{ fontSize: 15, color: PALETTE.muted, lineHeight: 18 }}>✎</Text>
+      </Pressable>
+
       {onDelete && (
-        <Pressable onPress={onDelete} hitSlop={8} style={{ padding: 4 }}>
+        <Pressable onPress={handleDelete} hitSlop={8} style={{ padding: 4 }}>
           <Text style={{ fontSize: 18, color: 'rgba(46,36,56,0.3)', lineHeight: 20 }}>×</Text>
         </Pressable>
       )}

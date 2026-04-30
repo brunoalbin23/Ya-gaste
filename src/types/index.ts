@@ -37,6 +37,42 @@ export interface Ingreso {
   profiles?: { nombre: string } | null;
 }
 
+export interface CustomCategory {
+  id: string;
+  familia_id: string;
+  nombre: string;
+  emoji: string;
+  color: string;
+  created_at: string;
+}
+
+export interface AllCategory {
+  id: string;
+  nombre: string;
+  emoji: string;
+  color: string;
+  tint: string;
+  anim?: string;
+  isCustom: boolean;
+}
+
+export interface AllTipoIngreso {
+  id: string;
+  nombre: string;
+  emoji: string;
+  color: string;
+  tint: string;
+  isCustom: boolean;
+}
+
+export interface DetectedGasto {
+  id: string;
+  categoria: string;
+  monto: number;
+  descripcion: string;
+  confianza: number;
+}
+
 export interface CategoryStats {
   total: number;
   count: number;

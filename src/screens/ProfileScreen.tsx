@@ -18,6 +18,116 @@ function Avatar({ nombre, size = 40 }: { nombre: string; size?: number }) {
   );
 }
 
+// ── Family setup screen (shown when familia === null) ────────────────────────
+
+function FamiliaSetup() {
+  const { createFamilia, joinFamilia } = useData();
+  const [mode, setMode] = useState<'idle' | 'join'>('idle');
+  const [codigoInput, setCodigoInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleCreate() {
+    setLoading(true);
+    setError(null);
+    try {
+      await createFamilia();
+    } catch (e: any) {
+      setError(e.message ?? 'No se pudo crear la familia');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleJoin() {
+    if (!codigoInput.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await joinFamilia(codigoInput);
+    } catch (e: any) {
+      setError(e.message.includes('inválido') ? 'Código inválido. Revisalo e intentá de nuevo.' : e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <View style={s.card}>
+      <Text style={[s.fieldLabel, { marginBottom: 4, marginTop: 0 }]}>Núcleo familiar</Text>
+      <Text style={{ fontSize: 13, color: PALETTE.muted, marginBottom: 20, lineHeight: 18 }}>
+        Organizá tus finanzas con tu familia. Podés crear un nuevo núcleo o unirte a uno existente.
+      </Text>
+
+      {/* Create */}
+      <Pressable
+        onPress={handleCreate}
+        disabled={loading}
+        style={({ pressed }) => [s.setupBtn, { backgroundColor: pressed ? '#1a3026' : '#1F3A2C', opacity: loading ? 0.6 : 1 }]}
+      >
+        {loading && mode === 'idle'
+          ? <ActivityIndicator color="#fff" size="small" />
+          : <>
+              <Text style={{ fontSize: 22, marginRight: 4 }}>🏠</Text>
+              <View>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>Crear núcleo familiar</Text>
+                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 1 }}>
+                  Generá tu familia y compartí el código
+                </Text>
+              </View>
+            </>
+        }
+      </Pressable>
+
+      {/* Join */}
+      {mode === 'idle' ? (
+        <Pressable onPress={() => setMode('join')} style={s.outlineBtn}>
+          <Text style={{ fontSize: 18, marginRight: 6 }}>🔗</Text>
+          <View>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: PALETTE.ink }}>Unirme a una familia</Text>
+            <Text style={{ fontSize: 11, color: PALETTE.muted, marginTop: 1 }}>Ingresá el código que te compartieron</Text>
+          </View>
+        </Pressable>
+      ) : (
+        <View style={{ marginTop: 12 }}>
+          <Text style={s.fieldLabel}>Código de familia</Text>
+          <TextInput
+            value={codigoInput}
+            onChangeText={v => { setCodigoInput(v.toUpperCase()); setError(null); }}
+            placeholder="Ej: CHAU42"
+            placeholderTextColor={PALETTE.muted}
+            autoCapitalize="characters"
+            maxLength={6}
+            style={s.input}
+          />
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+            <Pressable
+              onPress={() => { setMode('idle'); setCodigoInput(''); setError(null); }}
+              style={[s.outlineBtn, { flex: 1, marginTop: 0, flexDirection: 'row', justifyContent: 'center' }]}
+            >
+              <Text style={s.outlineBtnText}>Cancelar</Text>
+            </Pressable>
+            <Pressable
+              onPress={handleJoin}
+              disabled={loading || codigoInput.length < 4}
+              style={[s.smallBtn, { flex: 1, height: 44 }, (loading || codigoInput.length < 4) && { opacity: 0.4 }]}
+            >
+              {loading
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Text style={s.smallBtnText}>Unirse</Text>
+              }
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {error && <Text style={[s.errorText, { marginTop: 10 }]}>{error}</Text>}
+    </View>
+  );
+}
+
+// ── Main screen ───────────────────────────────────────────────────────────────
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { signOut } = useAuth();
@@ -108,11 +218,12 @@ export default function ProfileScreen() {
           <Avatar nombre={profile?.nombre ?? ''} size={52} />
           <View>
             <Text style={s.profileName}>{profile?.nombre}</Text>
-            <Text style={{ fontSize: 12, color: PALETTE.muted }}>Miembro de {familia?.nombre}</Text>
+            {familia && (
+              <Text style={{ fontSize: 12, color: PALETTE.muted }}>Miembro de {familia.nombre}</Text>
+            )}
           </View>
         </View>
 
-        {/* Editar nombre — Feature 3 */}
         <Text style={s.fieldLabel}>Nombre</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <TextInput
@@ -138,68 +249,74 @@ export default function ProfileScreen() {
         <Text style={s.hint}>Entre 2 y 30 caracteres</Text>
       </View>
 
-      {/* Mi Familia — Feature 2 */}
+      {/* Núcleo familiar */}
       <Text style={[s.sectionLabel, { marginTop: 24, marginBottom: 4 }]}>Núcleo familiar</Text>
 
-      <View style={s.card}>
-        {/* Código familiar */}
-        <Text style={s.fieldLabel}>Código para invitar</Text>
-        <Pressable onPress={copyCode} style={s.codeBox}>
-          <Text style={s.code}>{familia?.codigo ?? '——'}</Text>
-          <Text style={{ fontSize: 12, color: PALETTE.muted, marginTop: 4 }}>Tocá para copiar</Text>
-        </Pressable>
-
-        {/* Miembros */}
-        <Text style={[s.fieldLabel, { marginTop: 16 }]}>Miembros ({familiaMembers.length})</Text>
-        {familiaMembers.map(m => (
-          <View key={m.id} style={s.memberRow}>
-            <Avatar nombre={m.nombre} size={32} />
-            <Text style={{ fontSize: 14, color: PALETTE.ink, fontWeight: '500' }}>{m.nombre}</Text>
-            {m.user_id === profile?.user_id && (
-              <View style={s.youBadge}><Text style={{ fontSize: 10, color: PALETTE.muted, fontWeight: '600' }}>Vos</Text></View>
-            )}
-          </View>
-        ))}
-
-        {/* Unirse a otra familia */}
-        {!showJoinInput ? (
-          <Pressable onPress={() => setShowJoinInput(true)} style={s.outlineBtn}>
-            <Text style={s.outlineBtnText}>🔗 Unirse a otra familia</Text>
+      {!familia ? (
+        /* No family yet — show setup options */
+        <FamiliaSetup />
+      ) : (
+        /* Family exists — show details */
+        <View style={s.card}>
+          {/* Código familiar */}
+          <Text style={s.fieldLabel}>Código para invitar</Text>
+          <Pressable onPress={copyCode} style={s.codeBox}>
+            <Text style={s.code}>{familia.codigo}</Text>
+            <Text style={{ fontSize: 12, color: PALETTE.muted, marginTop: 4 }}>Tocá para copiar</Text>
           </Pressable>
-        ) : (
-          <View style={{ marginTop: 12 }}>
-            <Text style={s.fieldLabel}>Código de familia</Text>
-            <TextInput
-              value={codigoInput}
-              onChangeText={v => { setCodigoInput(v.toUpperCase()); setJoinError(null); }}
-              placeholder="Ej: CHAU42"
-              placeholderTextColor={PALETTE.muted}
-              autoCapitalize="characters"
-              maxLength={6}
-              style={s.input}
-            />
-            {joinError && <Text style={s.errorText}>{joinError}</Text>}
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-              <Pressable onPress={() => { setShowJoinInput(false); setCodigoInput(''); setJoinError(null); }} style={[s.outlineBtn, { flex: 1, marginTop: 0 }]}>
-                <Text style={s.outlineBtnText}>Cancelar</Text>
-              </Pressable>
-              <Pressable onPress={handleJoin} disabled={joiningFam || codigoInput.length < 4} style={[s.smallBtn, { flex: 1, height: 44 }, (joiningFam || codigoInput.length < 4) && { opacity: 0.4 }]}>
-                {joiningFam
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={s.smallBtnText}>Unirse</Text>
-                }
-              </Pressable>
+
+          {/* Miembros */}
+          <Text style={[s.fieldLabel, { marginTop: 16 }]}>Miembros ({familiaMembers.length})</Text>
+          {familiaMembers.map(m => (
+            <View key={m.id} style={s.memberRow}>
+              <Avatar nombre={m.nombre} size={32} />
+              <Text style={{ fontSize: 14, color: PALETTE.ink, fontWeight: '500' }}>{m.nombre}</Text>
+              {m.user_id === profile?.user_id && (
+                <View style={s.youBadge}><Text style={{ fontSize: 10, color: PALETTE.muted, fontWeight: '600' }}>Tu</Text></View>
+              )}
             </View>
-          </View>
-        )}
+          ))}
 
-        {/* Salir de familia (solo si hay más miembros) */}
-        {!isAlone && (
-          <Pressable onPress={handleLeave} style={[s.outlineBtn, { marginTop: 8, borderColor: '#FFB8B8' }]}>
-            <Text style={[s.outlineBtnText, { color: '#C0392B' }]}>Salir de la familia</Text>
-          </Pressable>
-        )}
-      </View>
+          {/* Unirse a otra familia */}
+          {!showJoinInput ? (
+            <Pressable onPress={() => setShowJoinInput(true)} style={s.outlineBtn}>
+              <Text style={s.outlineBtnText}>🔗 Unirse a otra familia</Text>
+            </Pressable>
+          ) : (
+            <View style={{ marginTop: 12 }}>
+              <Text style={s.fieldLabel}>Código de familia</Text>
+              <TextInput
+                value={codigoInput}
+                onChangeText={v => { setCodigoInput(v.toUpperCase()); setJoinError(null); }}
+                placeholder="Ej: CHAU42"
+                placeholderTextColor={PALETTE.muted}
+                autoCapitalize="characters"
+                maxLength={6}
+                style={s.input}
+              />
+              {joinError && <Text style={s.errorText}>{joinError}</Text>}
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                <Pressable onPress={() => { setShowJoinInput(false); setCodigoInput(''); setJoinError(null); }} style={[s.outlineBtn, { flex: 1, marginTop: 0 }]}>
+                  <Text style={s.outlineBtnText}>Cancelar</Text>
+                </Pressable>
+                <Pressable onPress={handleJoin} disabled={joiningFam || codigoInput.length < 4} style={[s.smallBtn, { flex: 1, height: 44 }, (joiningFam || codigoInput.length < 4) && { opacity: 0.4 }]}>
+                  {joiningFam
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={s.smallBtnText}>Unirse</Text>
+                  }
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+          {/* Salir de familia (solo si hay más miembros) */}
+          {!isAlone && (
+            <Pressable onPress={handleLeave} style={[s.outlineBtn, { marginTop: 8, borderColor: '#FFB8B8' }]}>
+              <Text style={[s.outlineBtnText, { color: '#C0392B' }]}>Salir de la familia</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
 
       {/* Logout */}
       <Pressable onPress={handleLogout} style={s.logoutBtn}>
@@ -218,7 +335,7 @@ const s = StyleSheet.create({
     shadowColor: PALETTE.ink, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 3,
   },
   profileName:    { ...FONTS.display, fontSize: 20, color: PALETTE.ink, letterSpacing: -0.3 },
-  fieldLabel:     { fontSize: 11, fontWeight: '700', color: PALETTE.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8, marginLeft: 2 },
+  fieldLabel:     { fontSize: 11, fontWeight: '700', color: PALETTE.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8, marginLeft: 2, marginTop: 4 },
   input: {
     backgroundColor: PALETTE.bg, borderRadius: 12,
     paddingHorizontal: 12, paddingVertical: 11,
@@ -244,10 +361,15 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(46,36,56,0.06)',
   },
   outlineBtn: {
-    marginTop: 12, height: 44, borderRadius: 12, borderWidth: 1.5,
-    borderColor: 'rgba(46,36,56,0.2)', alignItems: 'center', justifyContent: 'center',
+    marginTop: 12, height: 54, borderRadius: 14, borderWidth: 1.5,
+    borderColor: 'rgba(46,36,56,0.15)', flexDirection: 'row',
+    alignItems: 'center', paddingHorizontal: 16, gap: 2,
   },
   outlineBtnText: { fontSize: 13, fontWeight: '600', color: PALETTE.ink },
+  setupBtn: {
+    height: 62, borderRadius: 16, flexDirection: 'row',
+    alignItems: 'center', paddingHorizontal: 18, gap: 12, marginBottom: 10,
+  },
   avatar: {
     backgroundColor: PALETTE.accent, alignItems: 'center', justifyContent: 'center',
   },

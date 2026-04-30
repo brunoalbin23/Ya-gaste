@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Modal, Pressable, View, Text, ScrollView } from 'react-native';
+import { Animated, Modal, Pressable, View, Text, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONTS, PALETTE } from '../constants/theme';
 
@@ -24,6 +24,10 @@ export default function Sheet({ visible, onClose, title, children }) {
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       <Animated.View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(46,36,56,0.45)', opacity: fadeAnim }}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
         <Animated.View style={{
@@ -54,6 +58,7 @@ export default function Sheet({ visible, onClose, title, children }) {
           </ScrollView>
         </Animated.View>
       </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

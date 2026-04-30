@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CATEGORIES } from '../constants/categories';
 import { FONTS, PALETTE } from '../constants/theme';
 import { useData } from '../context/DataContext';
 import CategoryTile from '../components/CategoryTile';
@@ -27,7 +26,7 @@ function BalancePill({ label, value, positive }) {
 
 export default function DashboardScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { gastos, stats, profile, setShowNewCat, openAddExpense } = useData();
+  const { gastos, stats, profile, allCategories, setShowNewCat } = useData();
   const monthName = new Date().toLocaleDateString('es-AR', { month: 'long' });
   const firstName = profile?.nombre?.split(' ')[0] ?? 'vos';
 
@@ -50,15 +49,12 @@ export default function DashboardScreen({ navigation }) {
       </View>
 
       {/* Balance hero card */}
-      <View
-        style={{
-          borderRadius: 26, padding: 22, marginBottom: 18, overflow: 'hidden',
-          backgroundColor: PALETTE.accent,
-          shadowColor: PALETTE.accent, shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.4, shadowRadius: 20,
-          elevation: 8,
-        }}
-      >
-        {/* decorative ring */}
+      <View style={{
+        borderRadius: 26, padding: 22, marginBottom: 18, overflow: 'hidden',
+        backgroundColor: PALETTE.accent,
+        shadowColor: PALETTE.accent, shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.4, shadowRadius: 20,
+        elevation: 8,
+      }}>
         <View style={{ position: 'absolute', top: -40, right: -40, width: 140, height: 140, borderRadius: 70, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' }} />
         <View style={{ position: 'absolute', top: -10, right: -10, width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.18)' }} />
 
@@ -80,9 +76,9 @@ export default function DashboardScreen({ navigation }) {
         <Text style={{ fontSize: 12, color: PALETTE.muted }}>este mes</Text>
       </View>
 
-      {/* Categories grid */}
+      {/* Categories grid — base + custom */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 22 }}>
-        {CATEGORIES.map((cat, i) => (
+        {allCategories.map((cat) => (
           <View key={cat.id} style={{ width: '47.5%' }}>
             <CategoryTile
               cat={cat}
@@ -126,6 +122,11 @@ export default function DashboardScreen({ navigation }) {
         {gastos.slice(0, 4).map((g, i, arr) => (
           <ExpenseRow key={g.id} g={g} isLast={i === arr.length - 1} />
         ))}
+        {gastos.length === 0 && (
+          <View style={{ padding: 28, alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, color: PALETTE.muted }}>Sin movimientos todavía.</Text>
+          </View>
+        )}
       </View>
     </ScrollView>
   );

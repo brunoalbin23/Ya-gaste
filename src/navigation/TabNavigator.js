@@ -10,28 +10,32 @@ import IncomeScreen from '../screens/IncomeScreen';
 import ReportsScreen from '../screens/ReportsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
+const ICON_SIZE = 18;
+const LABEL_SIZE = 9;
+
 function NavIcon({ name, active }) {
   const color = active ? PALETTE.ink : PALETTE.muted;
-  if (name === 'home')   return <Text style={{ fontSize: 18, color }}>⌂</Text>;
-  if (name === 'list')   return <Text style={{ fontSize: 18, color }}>☰</Text>;
-  if (name === 'wallet') return <Text style={{ fontSize: 18, color }}>💰</Text>;
-  if (name === 'chart')  return <Text style={{ fontSize: 18, color }}>📊</Text>;
-  if (name === 'person') return <Text style={{ fontSize: 18, color }}>👤</Text>;
+  if (name === 'home')   return <Text style={{ fontSize: ICON_SIZE, color }}>⌂</Text>;
+  if (name === 'list')   return <Text style={{ fontSize: ICON_SIZE, color }}>☰</Text>;
+  if (name === 'add')    return <Text style={{ fontSize: ICON_SIZE, color }}>✦</Text>;
+  if (name === 'wallet') return <Text style={{ fontSize: ICON_SIZE, color }}>💰</Text>;
+  if (name === 'chart')  return <Text style={{ fontSize: ICON_SIZE, color }}>📊</Text>;
+  if (name === 'person') return <Text style={{ fontSize: ICON_SIZE, color }}>👤</Text>;
   return null;
 }
 
 const TABS = [
-  { name: 'Inicio',   icon: 'home'   },
-  { name: 'Gastos',   icon: 'list'   },
-  null, // botón +
-  { name: 'Ingresos', icon: 'wallet' },
-  { name: 'Reportes', icon: 'chart'  },
-  { name: 'Perfil',   icon: 'person' },
+  { name: 'Inicio',   icon: 'home',   route: 'Inicio'   },
+  { name: 'Gastos',   icon: 'list',   route: 'Gastos'   },
+  { name: 'Nuevo',    icon: 'add',    route: null        },
+  { name: 'Ingresos', icon: 'wallet', route: 'Ingresos' },
+  { name: 'Reportes', icon: 'chart',  route: 'Reportes' },
+  { name: 'Perfil',   icon: 'person', route: 'Perfil'   },
 ];
 
 function CustomTabBar({ state, navigation }) {
   const insets = useSafeAreaInsets();
-  const { openAddExpense } = useData();
+  const { setShowAISheet } = useData();
   const routeNames = state.routes.map(r => r.name);
 
   return (
@@ -42,39 +46,20 @@ function CustomTabBar({ state, navigation }) {
         shadowColor: PALETTE.ink, shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.08, shadowRadius: 12, elevation: 8,
       }}>
-        {TABS.map((item, idx) => {
-          if (!item) {
-            return (
-              <View key="add" style={{ flex: 1, alignItems: 'center' }}>
-                <Pressable
-                  onPress={() => openAddExpense()}
-                  style={({ pressed }) => ({
-                    width: 48, height: 48, borderRadius: 16,
-                    backgroundColor: pressed ? '#1a1020' : PALETTE.ink,
-                    alignItems: 'center', justifyContent: 'center',
-                    marginTop: -16,
-                    shadowColor: PALETTE.ink, shadowOffset: { width: 0, height: 8 },
-                    shadowOpacity: 0.3, shadowRadius: 10, elevation: 6,
-                  })}
-                >
-                  <Text style={{ color: '#fff', fontSize: 24, lineHeight: 28, marginTop: -2 }}>+</Text>
-                </Pressable>
-              </View>
-            );
-          }
-
-          const routeIndex = routeNames.indexOf(item.name);
-          const active = state.index === routeIndex;
+        {TABS.map((item) => {
+          const isAction = item.route === null;
+          const routeIndex = isAction ? -1 : routeNames.indexOf(item.route);
+          const active = !isAction && state.index === routeIndex;
 
           return (
             <Pressable
               key={item.name}
-              onPress={() => navigation.navigate(item.name)}
+              onPress={() => isAction ? setShowAISheet(true) : navigation.navigate(item.route)}
               style={{ flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%', gap: 2 }}
             >
               <NavIcon name={item.icon} active={active} />
               <Text style={{
-                fontSize: 9, ...FONTS.bodySemiBold,
+                fontSize: LABEL_SIZE, ...FONTS.bodySemiBold,
                 color: active ? PALETTE.ink : PALETTE.muted,
                 opacity: active ? 1 : 0.7,
               }}>

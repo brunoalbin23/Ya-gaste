@@ -1,7 +1,6 @@
 import React from 'react';
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import { View, Text, ScrollView, Pressable, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CATEGORY_BY_ID } from '../constants/categories';
 import { FONTS, PALETTE } from '../constants/theme';
 import { useData } from '../context/DataContext';
 import ExpenseRow from '../components/ExpenseRow';
@@ -10,13 +9,41 @@ import { formatARS } from '../utils/format';
 export default function CategoryDetailScreen({ route, navigation }) {
   const { catId } = route.params;
   const insets = useSafeAreaInsets();
-  const { gastos, stats, deleteExpense, openAddExpense } = useData();
-  const cat = CATEGORY_BY_ID[catId];
+  const { gastos, stats, deleteExpense, openAddExpense, allCategories, deleteCustomCategory } = useData();
 
+  const cat = allCategories.find(c => c.id === catId);
   if (!cat) return null;
 
   const items = gastos.filter(g => g.categoria === catId);
   const total = stats.byCat[catId]?.total || 0;
+
+  function handleDeleteCategory() {
+    if (items.length > 0) {
+      Alert.alert(
+        'No se puede eliminar',
+        `Esta categoría tiene ${items.length} gasto${items.length !== 1 ? 's' : ''}. Eliminá los gastos primero para poder borrar la categoría.`,
+      );
+      return;
+    }
+    Alert.alert(
+      'Eliminar categoría',
+      `¿Eliminar "${cat.nombre}"? Esta acción no se puede deshacer.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar', style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteCustomCategory(catId);
+              navigation.goBack();
+            } catch (e) {
+              Alert.alert('Error', e.message ?? 'No se pudo eliminar');
+            }
+          },
+        },
+      ],
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: PALETTE.bg }}>
@@ -87,6 +114,22 @@ export default function CategoryDetailScreen({ route, navigation }) {
             Agregar gasto a {cat.nombre}
           </Text>
         </Pressable>
+
+        {/* Delete category — solo para custom */}
+        {cat.isCustom && (
+          <Pressable
+            onPress={handleDeleteCategory}
+            style={{
+              marginTop: 10, height: 44, borderRadius: 14,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: 'rgba(176,48,48,0.07)',
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: '600', color: '#B03030' }}>
+              Eliminar categoría
+            </Text>
+          </Pressable>
+        )}
       </ScrollView>
     </View>
   );

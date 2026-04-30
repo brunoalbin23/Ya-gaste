@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, Pressable, StyleSheet,
+  View, Text, TextInput, Pressable, StyleSheet, Alert,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,6 +24,7 @@ export default function AuthScreen() {
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,15 +33,30 @@ export default function AuthScreen() {
     setError(null);
   }
 
+  function goToLogin() {
+    setMode('login');
+    setError(null);
+    setNombre('');
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+  }
+
   async function handleSubmit() {
     setError(null);
     if (!email.trim() || !password.trim()) {
       setError('Completá todos los campos');
       return;
     }
-    if (mode === 'register' && nombre.trim().length < 2) {
-      setError('El nombre debe tener al menos 2 caracteres');
-      return;
+    if (mode === 'register') {
+      if (nombre.trim().length < 2) {
+        setError('El nombre debe tener al menos 2 caracteres');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('Las contraseñas no coinciden');
+        return;
+      }
     }
     setLoading(true);
     try {
@@ -48,6 +64,11 @@ export default function AuthScreen() {
         await signIn(email.trim(), password);
       } else {
         await signUp(email.trim(), password, nombre.trim());
+        Alert.alert(
+          '¡Registro exitoso! 📧',
+          `Te enviamos un correo de confirmación a ${email.trim()}.\n\nConfirmá tu cuenta y después iniciá sesión.`,
+          [{ text: 'Entendido', onPress: goToLogin }],
+        );
       }
     } catch (e: any) {
       setError(mapError(e.message ?? 'Error inesperado'));
@@ -119,6 +140,19 @@ export default function AuthScreen() {
             secureTextEntry
             style={s.input}
           />
+
+          {mode === 'register' && (
+            <>
+              <Text style={s.label}>Confirmar contraseña</Text>
+              <TextInput
+                value={confirmPassword} onChangeText={setConfirmPassword}
+                placeholder="Repetí tu contraseña"
+                placeholderTextColor={PALETTE.muted}
+                secureTextEntry
+                style={s.input}
+              />
+            </>
+          )}
 
           {error && (
             <View style={s.errorBox}>

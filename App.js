@@ -14,6 +14,7 @@ import CategoryDetailScreen from './src/screens/CategoryDetailScreen';
 import AddExpenseSheet from './src/sheets/AddExpenseSheet';
 import AddIncomeSheet from './src/sheets/AddIncomeSheet';
 import NewCategorySheet from './src/sheets/NewCategorySheet';
+import AIExpenseSheet from './src/sheets/AIExpenseSheet';
 import AuthScreen from './src/screens/auth/AuthScreen';
 import { PALETTE } from './src/constants/theme';
 
@@ -45,6 +46,7 @@ function MainApp() {
             <Stack.Screen name="CategoryDetail" component={CategoryDetailScreen} />
           </Stack.Navigator>
         </NavigationContainer>
+        <AIExpenseSheet />
         <AddExpenseSheet />
         <AddIncomeSheet />
         <NewCategorySheet />

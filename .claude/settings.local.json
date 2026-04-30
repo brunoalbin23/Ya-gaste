@@ -19,7 +19,8 @@
       "Bash(mv rn/* .)",
       "Bash(mv rn/.* .)",
       "Bash(rmdir rn *)",
-      "Bash(node -e \"console.log\\(require\\('./node_modules/@react-native-async-storage/async-storage/package.json'\\).version\\)\")"
+      "Bash(node -e \"console.log\\(require\\('./node_modules/@react-native-async-storage/async-storage/package.json'\\).version\\)\")",
+      "Skill(claude-api)"
     ]
   }
 }

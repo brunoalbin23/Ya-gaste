@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native';
 import { FONTS, PALETTE } from '../constants/theme';
 import { useData } from '../context/DataContext';
 import Sheet from '../components/Sheet';
 
 const PASTEL_COLORS = [
-  '#FFB8B8', '#FFD58A', '#9DD6EE', '#C5B8E3',
-  '#9FDCB8', '#F5A8C7', '#B8E6C8', '#FFE5A3',
-  '#A8D8F0', '#DDB8E3', '#F0D0B8', '#C8D8F0',
+  '#B8E6C8', '#9DD6EE', '#FFD58A', '#C5B8E3',
+  '#FFB8B8', '#F5A8C7', '#FFE5A3', '#A8D8F0',
+  '#DDB8E3', '#9FDCB8', '#F0D0B8', '#C8D8F0',
 ];
 
 const PRESET_EMOJIS = [
-  '🏋️', '✈️', '🎁', '📚', '🐾', '🎮', '💄', '🛍️', '☕', '🎵', '🌿', '💻', '🏖️', '🔧', '🍷', '🎭',
-  '🍔', '🚂', '🏥', '🎪', '🌍', '🏆', '🎂', '🌸', '🧘', '⚽', '🎸', '🍣', '🛁', '🏡', '🐶', '🎨',
+  '💼', '💰', '🏦', '📈', '🤝', '🎓', '🏠', '💻', '🎯', '✈️', '🎁', '🔧',
+  '💵', '🪙', '📊', '🛒', '🎨', '🏋️', '🔑', '🚀', '🌱', '💎', '🤑', '🏅',
 ];
 
 function FormLabel({ children }) {
@@ -26,11 +26,12 @@ function FormLabel({ children }) {
   );
 }
 
-export default function NewCategorySheet() {
-  const { showNewCat, setShowNewCat, addCustomCategory } = useData();
+export default function NewTipoIngresoSheet() {
+  const { showNewIncomeTipo, setShowNewIncomeTipo, addCustomIncomeTipo } = useData();
+
   const [nombre, setNombre] = useState('');
-  const [emoji, setEmoji] = useState('📦');
-  const [color, setColor] = useState('#C5B8E3');
+  const [emoji, setEmoji] = useState('💰');
+  const [color, setColor] = useState('#B8E6C8');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -38,11 +39,11 @@ export default function NewCategorySheet() {
 
   function handleClose() {
     setNombre('');
-    setEmoji('📦');
-    setColor('#C5B8E3');
+    setEmoji('💰');
+    setColor('#B8E6C8');
     setError(null);
     setSaving(false);
-    setShowNewCat(false);
+    setShowNewIncomeTipo(false);
   }
 
   async function submit() {
@@ -50,7 +51,7 @@ export default function NewCategorySheet() {
     setSaving(true);
     setError(null);
     try {
-      await addCustomCategory({ nombre: nombre.trim(), emoji, color });
+      await addCustomIncomeTipo({ nombre: nombre.trim(), emoji, color });
       handleClose();
     } catch (e) {
       setError(e.message ?? 'Error al guardar');
@@ -60,7 +61,7 @@ export default function NewCategorySheet() {
   }
 
   return (
-    <Sheet visible={showNewCat} onClose={handleClose} title="Nueva categoría">
+    <Sheet visible={showNewIncomeTipo} onClose={handleClose} title="Nuevo tipo de ingreso">
       {/* Preview */}
       <View style={{
         alignSelf: 'center', marginBottom: 20,
@@ -72,12 +73,11 @@ export default function NewCategorySheet() {
         <Text style={{ fontSize: 36 }}>{emoji}</Text>
       </View>
 
-      {/* Nombre */}
       <FormLabel>Nombre</FormLabel>
       <TextInput
         value={nombre}
         onChangeText={setNombre}
-        placeholder="Ej: Gym, Viajes, Regalos…"
+        placeholder="Ej: Préstamo, Alquiler, Beca…"
         placeholderTextColor={PALETTE.muted}
         maxLength={20}
         style={{
@@ -88,7 +88,6 @@ export default function NewCategorySheet() {
         }}
       />
 
-      {/* Emoji */}
       <FormLabel>Emoji</FormLabel>
       <TextInput
         value={emoji}
@@ -96,8 +95,6 @@ export default function NewCategorySheet() {
           const chars = [...v];
           if (chars.length > 0) setEmoji(chars[chars.length - 1]);
         }}
-        placeholder="📦"
-        placeholderTextColor={PALETTE.muted}
         style={{
           backgroundColor: PALETTE.card, borderRadius: 14,
           paddingHorizontal: 14, paddingVertical: 10,
@@ -122,7 +119,6 @@ export default function NewCategorySheet() {
         ))}
       </View>
 
-      {/* Color */}
       <FormLabel>Color</FormLabel>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
         {PASTEL_COLORS.map(c => (
@@ -148,13 +144,13 @@ export default function NewCategorySheet() {
         disabled={!canSave || saving}
         style={{
           height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
-          backgroundColor: canSave ? PALETTE.ink : 'rgba(46,36,56,0.2)',
+          backgroundColor: canSave ? '#1F3A2C' : 'rgba(46,36,56,0.2)',
           marginBottom: 8, opacity: saving ? 0.6 : 1,
         }}
       >
         {saving
           ? <ActivityIndicator color="#fff" />
-          : <Text style={{ ...FONTS.display, fontWeight: '600', fontSize: 15, color: '#fff' }}>Crear categoría</Text>
+          : <Text style={{ ...FONTS.display, fontWeight: '600', fontSize: 15, color: '#fff' }}>Crear tipo</Text>
         }
       </Pressable>
     </Sheet>
