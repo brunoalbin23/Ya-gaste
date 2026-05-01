@@ -90,6 +90,30 @@ export async function analyzeText(text: string, categories: AllCategory[]): Prom
   }
 }
 
+export async function transcribeAudio(uri: string): Promise<string> {
+  const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
+  if (!apiKey) throw new Error('Falta configurar la API key de OpenAI');
+
+  const formData = new FormData();
+  formData.append('file', { uri, name: 'recording.m4a', type: 'audio/m4a' } as any);
+  formData.append('model', 'whisper-1');
+  formData.append('language', 'es');
+
+  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}` },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Error de Whisper (${res.status}): ${err}`);
+  }
+
+  const data = await res.json();
+  return (data.text ?? '').trim();
+}
+
 export async function analyzeImage(base64: string, mediaType: string, categories: AllCategory[]): Promise<DetectedGasto[]> {
   const systemPrompt = buildSystemPrompt(categories);
   const userContent = [

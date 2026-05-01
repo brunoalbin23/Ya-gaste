@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, Alert,
-  KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
+  KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
@@ -12,9 +12,17 @@ type Mode = 'login' | 'register';
 function mapError(msg: string): string {
   if (msg.includes('Invalid login')) return 'Email o contraseña incorrectos';
   if (msg.includes('already registered')) return 'Este email ya tiene una cuenta';
-  if (msg.includes('Password should')) return 'La contraseña debe tener al menos 6 caracteres';
+  if (msg.includes('Password should')) return 'La contraseña no cumple los requisitos mínimos';
   if (msg.includes('valid email')) return 'Ingresá un email válido';
   return msg;
+}
+
+function validatePassword(pass: string): string | null {
+  if (pass.length < 8) return 'La contraseña debe tener al menos 8 caracteres';
+  if (!/[A-Z]/.test(pass)) return 'La contraseña debe tener al menos una mayúscula';
+  if (!/[0-9]/.test(pass)) return 'La contraseña debe incluir al menos un número';
+  if (!/[^A-Za-z0-9]/.test(pass)) return 'La contraseña debe incluir al menos un caracter especial';
+  return null;
 }
 
 export default function AuthScreen() {
@@ -53,6 +61,11 @@ export default function AuthScreen() {
         setError('El nombre debe tener al menos 2 caracteres');
         return;
       }
+      const passError = validatePassword(password);
+      if (passError) {
+        setError(passError);
+        return;
+      }
       if (password !== confirmPassword) {
         setError('Las contraseñas no coinciden');
         return;
@@ -89,8 +102,7 @@ export default function AuthScreen() {
       >
         {/* Logo */}
         <View style={s.logo}>
-          <Text style={s.logoEmoji}>💸</Text>
-          <Text style={s.logoTitle}>Chaucha</Text>
+          <Image source={require('../../../assets/logo-ya-pague.png')} style={s.logoImg} />
           <Text style={s.logoSub}>Tus finanzas, en familia</Text>
         </View>
 
@@ -135,7 +147,7 @@ export default function AuthScreen() {
           <Text style={s.label}>Contraseña</Text>
           <TextInput
             value={password} onChangeText={setPassword}
-            placeholder="Mínimo 6 caracteres"
+            placeholder="••••••••"
             placeholderTextColor={PALETTE.muted}
             secureTextEntry
             style={s.input}
@@ -181,9 +193,9 @@ export default function AuthScreen() {
 const s = StyleSheet.create({
   container:      { paddingHorizontal: 24, flexGrow: 1 },
   logo:           { alignItems: 'center', marginBottom: 32 },
-  logoEmoji:      { fontSize: 56, marginBottom: 8 },
+  logoImg:        { width: 90, height: 90, resizeMode: 'contain', marginBottom: 8 },
   logoTitle:      { fontSize: 34, fontWeight: '700', color: PALETTE.ink, letterSpacing: -1.2 },
-  logoSub:        { fontSize: 14, color: PALETTE.muted, marginTop: 4 },
+  logoSub:        { fontSize: 17, color: PALETTE.muted, marginTop: 4 },
   card: {
     backgroundColor: PALETTE.card, borderRadius: 28, padding: 20,
     shadowColor: PALETTE.ink, shadowOffset: { width: 0, height: 8 },
