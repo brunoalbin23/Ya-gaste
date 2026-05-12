@@ -90,12 +90,16 @@ export async function analyzeText(text: string, categories: AllCategory[]): Prom
   }
 }
 
-export async function transcribeAudio(uri: string): Promise<string> {
+export async function transcribeAudio(audio: string | Blob): Promise<string> {
   const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
   if (!apiKey) throw new Error('Falta configurar la API key de OpenAI');
 
   const formData = new FormData();
-  formData.append('file', { uri, name: 'recording.m4a', type: 'audio/m4a' } as any);
+  if (typeof audio === 'string') {
+    formData.append('file', { uri: audio, name: 'recording.m4a', type: 'audio/m4a' } as any);
+  } else {
+    formData.append('file', audio, 'recording.webm');
+  }
   formData.append('model', 'whisper-1');
   formData.append('language', 'es');
 

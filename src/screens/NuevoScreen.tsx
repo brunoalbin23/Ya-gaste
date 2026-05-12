@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, Pressable, ActivityIndicator,
-  ScrollView, Alert, Image, Animated,
+  ScrollView, Alert, Image, Animated, Platform,
 } from 'react-native';
 import { Audio } from 'expo-av';
-import * as ImagePicker from 'expo-image-picker';
+import { pickFromLibrary, pickFromCamera } from '../utils/imagePicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLayout } from '../hooks/useLayout';
 import { FONTS, PALETTE } from '../constants/theme';
 import { useData } from '../context/DataContext';
 import { analyzeText, analyzeImage, transcribeAudio } from '../services/aiService';
@@ -144,6 +145,7 @@ function ExpenseCard({ item, allCategories, openDropdownId, setOpenDropdownId, o
 
 export default function NuevoScreen({ navigation }: { navigation: any }) {
   const insets = useSafeAreaInsets();
+  const { isDesktop } = useLayout();
   const { allCategories, addExpenses } = useData();
 
   // Main flow
@@ -171,6 +173,8 @@ export default function NuevoScreen({ navigation }: { navigation: any }) {
   const [recordingTime, setRecordingTime] = useState(0);
   const [transcribedText, setTranscribedText] = useState('');
   const recordingRef = useRef<Audio.Recording | null>(null);
+  const mediaRecorderRef = useRef<any>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -202,7 +206,11 @@ export default function NuevoScreen({ navigation }: { navigation: any }) {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (autoStopRef.current) clearTimeout(autoStopRef.current);
-      recordingRef.current?.stopAndUnloadAsync().catch(() => {});
+      if (Platform.OS === 'web') {
+        try { mediaRecorderRef.current?.stream?.getTracks().forEach((t: any) => t.stop()); } catch {}
+      } else {
+        recordingRef.current?.stopAndUnloadAsync().catch(() => {});
+      }
     };
   }, []);
 
@@ -216,9 +224,68 @@ export default function NuevoScreen({ navigation }: { navigation: any }) {
     });
   }
 
-  // ── Recording ─────────────────────────────────────────────────────────────
+  // ── Recording (web) ───────────────────────────────────────────────────────
+
+  async function startRecordingWeb() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new (window as any).MediaRecorder(stream);
+      audioChunksRef.current = [];
+      mediaRecorder.ondataavailable = (e: any) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start();
+      setDictarPhase('recording');
+      setRecordingTime(0);
+      let elapsed = 0;
+      timerRef.current = setInterval(() => { elapsed++; setRecordingTime(elapsed); }, 1000);
+      autoStopRef.current = setTimeout(async () => {
+        if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+        await stopRecordingWeb();
+      }, MAX_RECORDING_SECONDS * 1000);
+    } catch {
+      Alert.alert('Permiso necesario', 'Necesitamos acceso al micrófono para grabar audio.');
+    }
+  }
+
+  async function discardRecordingWeb() {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (autoStopRef.current) { clearTimeout(autoStopRef.current); autoStopRef.current = null; }
+    try { mediaRecorderRef.current?.stream?.getTracks().forEach((t: any) => t.stop()); } catch {}
+    mediaRecorderRef.current = null;
+    audioChunksRef.current = [];
+    setDictarPhase('idle');
+    setRecordingTime(0);
+  }
+
+  async function stopRecordingWeb() {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (autoStopRef.current) { clearTimeout(autoStopRef.current); autoStopRef.current = null; }
+    const recorder = mediaRecorderRef.current;
+    if (!recorder) return;
+    recorder.onstop = async () => {
+      try { recorder.stream?.getTracks().forEach((t: any) => t.stop()); } catch {}
+      mediaRecorderRef.current = null;
+      const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      audioChunksRef.current = [];
+      try {
+        const text = await transcribeAudio(blob);
+        setTranscribedText(text);
+        setDictarPhase('review');
+      } catch (e: any) {
+        setDictarPhase('idle');
+        Alert.alert('Error de transcripción', e.message ?? 'No se pudo transcribir el audio.');
+      }
+    };
+    setDictarPhase('transcribing');
+    recorder.stop();
+  }
+
+  // ── Recording (native) ────────────────────────────────────────────────────
 
   async function discardRecording() {
+    if (Platform.OS === 'web') return discardRecordingWeb();
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     if (autoStopRef.current) { clearTimeout(autoStopRef.current); autoStopRef.current = null; }
     if (recordingRef.current) {
@@ -235,14 +302,8 @@ export default function NuevoScreen({ navigation }: { navigation: any }) {
       await rec.stopAndUnloadAsync();
       const uri = rec.getURI();
       recordingRef.current = null;
-
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-
-      if (!uri) {
-        setTranscribedText('');
-        setDictarPhase('review');
-        return;
-      }
+      if (!uri) { setTranscribedText(''); setDictarPhase('review'); return; }
       const text = await transcribeAudio(uri);
       setTranscribedText(text);
       setDictarPhase('review');
@@ -253,28 +314,19 @@ export default function NuevoScreen({ navigation }: { navigation: any }) {
   }
 
   async function startRecording() {
+    if (Platform.OS === 'web') return startRecordingWeb();
     const { status } = await Audio.requestPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permiso necesario', 'Necesitamos acceso al micrófono para grabar audio.');
       return;
     }
-
     await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-
-    const { recording } = await Audio.Recording.createAsync(
-      Audio.RecordingOptionsPresets.HIGH_QUALITY
-    );
-
+    const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
     recordingRef.current = recording;
     setDictarPhase('recording');
     setRecordingTime(0);
-
     let elapsed = 0;
-    timerRef.current = setInterval(() => {
-      elapsed += 1;
-      setRecordingTime(elapsed);
-    }, 1000);
-
+    timerRef.current = setInterval(() => { elapsed += 1; setRecordingTime(elapsed); }, 1000);
     autoStopRef.current = setTimeout(async () => {
       if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
       if (recordingRef.current) await doStopAndTranscribe(recordingRef.current);
@@ -282,6 +334,7 @@ export default function NuevoScreen({ navigation }: { navigation: any }) {
   }
 
   async function stopRecording() {
+    if (Platform.OS === 'web') return stopRecordingWeb();
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     if (autoStopRef.current) { clearTimeout(autoStopRef.current); autoStopRef.current = null; }
     if (recordingRef.current) await doStopAndTranscribe(recordingRef.current);
@@ -388,22 +441,11 @@ export default function NuevoScreen({ navigation }: { navigation: any }) {
 
   async function pickImage(fromCamera: boolean) {
     try {
-      let result: ImagePicker.ImagePickerResult;
-      if (fromCamera) {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') { Alert.alert('Permiso necesario', 'Necesitamos acceso a la cámara.'); return; }
-        result = await ImagePicker.launchCameraAsync({ mediaTypes: 'images', quality: 0.6, base64: true });
-      } else {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') { Alert.alert('Permiso necesario', 'Necesitamos acceso a la galería.'); return; }
-        result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.6, base64: true });
-      }
-      if (!result.canceled && result.assets?.[0]) {
-        const asset = result.assets[0];
-        setImageUri(asset.uri);
-        setImageBase64(asset.base64 ?? null);
-        const ext = (asset.uri.split('.').pop() ?? 'jpg').toLowerCase();
-        setImageMediaType(ext === 'png' ? 'image/png' : 'image/jpeg');
+      const result = fromCamera ? await pickFromCamera() : await pickFromLibrary();
+      if (result) {
+        setImageUri(result.uri);
+        setImageBase64(result.base64);
+        setImageMediaType(result.mediaType);
       }
     } catch {
       Alert.alert('Error', 'No se pudo acceder a la cámara/galería.');
@@ -428,7 +470,7 @@ export default function NuevoScreen({ navigation }: { navigation: any }) {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: PALETTE.bg }}
-      contentContainerStyle={{ paddingTop: insets.top + 20, paddingHorizontal: 18, paddingBottom: insets.bottom + 100 }}
+      contentContainerStyle={{ paddingTop: isDesktop ? 32 : insets.top + 20, paddingHorizontal: isDesktop ? 32 : 18, paddingBottom: isDesktop ? 40 : insets.bottom + 100 }}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >

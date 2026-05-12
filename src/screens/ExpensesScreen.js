@@ -3,12 +3,14 @@ import { View, Text, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONTS, PALETTE } from '../constants/theme';
 import { useData } from '../context/DataContext';
+import { useLayout } from '../hooks/useLayout';
 import ExpenseRow from '../components/ExpenseRow';
 import EmptyState from '../components/EmptyState';
 import { formatARS, relativeDate } from '../utils/format';
 
 export default function ExpensesScreen() {
   const insets = useSafeAreaInsets();
+  const { isDesktop } = useLayout();
   const { gastos, deleteExpense } = useData();
 
   const groups = useMemo(() => {
@@ -26,7 +28,7 @@ export default function ExpensesScreen() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: PALETTE.bg }}
-      contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 18, paddingBottom: 100 }}
+      contentContainerStyle={{ paddingTop: isDesktop ? 32 : insets.top + 8, paddingHorizontal: isDesktop ? 32 : 18, paddingBottom: isDesktop ? 40 : 100 }}
       showsVerticalScrollIndicator={false}
     >
       <View style={{ marginBottom: 18 }}>

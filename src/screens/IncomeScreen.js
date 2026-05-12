@@ -3,17 +3,19 @@ import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONTS, PALETTE } from '../constants/theme';
 import { useData } from '../context/DataContext';
+import { useLayout } from '../hooks/useLayout';
 import IncomeRow from '../components/IncomeRow';
 import { formatARS } from '../utils/format';
 
 export default function IncomeScreen() {
   const insets = useSafeAreaInsets();
+  const { isDesktop } = useLayout();
   const { ingresos, stats, deleteIncome, setShowAddIncome } = useData();
 
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: PALETTE.bg }}
-      contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 18, paddingBottom: 100 }}
+      contentContainerStyle={{ paddingTop: isDesktop ? 32 : insets.top + 8, paddingHorizontal: isDesktop ? 32 : 18, paddingBottom: isDesktop ? 40 : 100 }}
       showsVerticalScrollIndicator={false}
     >
       <View style={{ marginBottom: 18 }}>

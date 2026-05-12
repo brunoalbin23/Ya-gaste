@@ -1,10 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert, Platform, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { FONTS, PALETTE } from '../constants/theme';
 import { useData } from '../context/DataContext';
+import { useLayout } from '../hooks/useLayout';
+import { useSidebar } from '../context/SidebarContext';
 import { supabase } from '../../lib/supabase';
 import DonutChart from '../components/charts/DonutChart';
 import BarChart from '../components/charts/BarChart';
@@ -109,7 +111,7 @@ function buildPDFHtml({ mes, year, gastos, ingresos, stats, donutData, allCatego
 </head>
 <body>
   <div class="header">
-    <h1>💸 Chaucha</h1>
+    <h1>💸 Ya gasté</h1>
     <p class="subtitle">Reporte de ${mes} ${year}</p>
   </div>
 
@@ -155,13 +157,16 @@ function buildPDFHtml({ mes, year, gastos, ingresos, stats, donutData, allCatego
     </table>
   </div>` : ''}
 
-  <div class="footer">Generado por Chaucha · ${mes} ${year}</div>
+  <div class="footer">Generado por Ya gasté · ${mes} ${year}</div>
 </body>
 </html>`;
 }
 
 export default function ReportsScreen() {
   const insets = useSafeAreaInsets();
+  const { isDesktop } = useLayout();
+  const { sidebarWidth } = useSidebar();
+  const { width: windowWidth } = useWindowDimensions();
   const { gastos: ctxGastos, ingresos: ctxIngresos, stats, allCategories } = useData();
 
   const now = new Date();
@@ -311,8 +316,12 @@ export default function ReportsScreen() {
         donutData,
         allCategories,
       });
-      const { uri } = await Print.printToFileAsync({ html, base64: false });
-      await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: '.pdf' });
+      if (Platform.OS === 'web') {
+        await Print.printAsync({ html });
+      } else {
+        const { uri } = await Print.printToFileAsync({ html, base64: false });
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: '.pdf' });
+      }
     } catch (e) {
       Alert.alert('Error', 'No se pudo exportar el reporte.');
     } finally {
@@ -320,150 +329,191 @@ export default function ReportsScreen() {
     }
   }
 
+  // Compute chart width for desktop: content area minus sidebar, padding, and gap
+  const contentWidth = isDesktop ? windowWidth - sidebarWidth - 64 : windowWidth - 36;
+  const halfChartWidth = isDesktop ? (contentWidth - 14) / 2 : contentWidth;
+  const lineChartWidth = contentWidth - 36;
+
+  const hPad = isDesktop ? 32 : 18;
+  const topPad = isDesktop ? 32 : insets.top + 8;
+  const botPad = isDesktop ? 40 : 100;
+
+  // ── Shared sub-components ──────────────────────────────────────────────────
+
+  const PageHeader = () => (
+    <View style={{ marginBottom: 14, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+      <View>
+        <Text style={{ fontSize: 12, color: PALETTE.muted, letterSpacing: 0.4, textTransform: 'uppercase', fontWeight: '600' }}>
+          Análisis
+        </Text>
+        <Text style={{ ...FONTS.display, fontSize: isDesktop ? 30 : 28, color: PALETTE.ink, letterSpacing: -0.6, marginTop: 2 }}>
+          Reportes
+        </Text>
+      </View>
+      <Pressable
+        onPress={exportPDF}
+        disabled={exporting}
+        style={({ pressed }) => ({
+          flexDirection: 'row', alignItems: 'center', gap: 6,
+          paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12,
+          backgroundColor: pressed ? 'rgba(46,36,56,0.1)' : PALETTE.card,
+          borderWidth: 1, borderColor: 'rgba(46,36,56,0.1)',
+          opacity: exporting ? 0.6 : 1,
+          shadowColor: PALETTE.ink, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1,
+        })}
+      >
+        {exporting
+          ? <ActivityIndicator size="small" color={PALETTE.ink} />
+          : <Text style={{ fontSize: 14 }}>📄</Text>
+        }
+        <Text style={{ fontSize: 12, fontWeight: '600', color: PALETTE.ink }}>
+          {exporting ? 'Exportando…' : 'Exportar PDF'}
+        </Text>
+      </Pressable>
+    </View>
+  );
+
+  const MonthNavigator = () => (
+    <View style={{
+      flexDirection: 'row', alignItems: 'center',
+      backgroundColor: 'rgba(46,36,56,0.06)', borderRadius: 16, padding: 4, marginBottom: 16,
+    }}>
+      <Pressable
+        onPress={prevMonth}
+        style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 12 }}
+      >
+        <Text style={{ fontSize: 22, color: PALETTE.ink, lineHeight: 28 }}>‹</Text>
+      </Pressable>
+      <View style={{ flex: 1, alignItems: 'center' }}>
+        <Text style={{ ...FONTS.bodySemiBold, fontSize: 14, color: PALETTE.ink }}>
+          {MESES[selMonth]} {selYear}
+        </Text>
+      </View>
+      <Pressable
+        onPress={nextMonth}
+        disabled={isCurrentMonth}
+        style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 12, opacity: isCurrentMonth ? 0.25 : 1 }}
+      >
+        <Text style={{ fontSize: 22, color: PALETTE.ink, lineHeight: 28 }}>›</Text>
+      </Pressable>
+    </View>
+  );
+
+  const SummaryRow = () => (
+    <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+      <View style={{ flex: 1, backgroundColor: '#ECE6F6', borderRadius: 18, padding: 14 }}>
+        <Text style={{ fontSize: 10, fontWeight: '700', color: PALETTE.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Gastos</Text>
+        <Text style={{ ...FONTS.display, fontSize: 17, color: PALETTE.ink, letterSpacing: -0.5, marginTop: 4 }} numberOfLines={1}>
+          {formatARS(activeStats?.totalGastos ?? 0)}
+        </Text>
+      </View>
+      <View style={{ flex: 1, backgroundColor: '#B8E6C8', borderRadius: 18, padding: 14 }}>
+        <Text style={{ fontSize: 10, fontWeight: '700', color: '#1F3A2C', textTransform: 'uppercase', letterSpacing: 0.5, opacity: 0.7 }}>Ingresos</Text>
+        <Text style={{ ...FONTS.display, fontSize: 17, color: '#1F3A2C', letterSpacing: -0.5, marginTop: 4 }} numberOfLines={1}>
+          {formatARS(activeStats?.totalIngresos ?? 0)}
+        </Text>
+      </View>
+      <View style={{ flex: 1, backgroundColor: PALETTE.card, borderRadius: 18, padding: 14 }}>
+        <Text style={{ fontSize: 10, fontWeight: '700', color: PALETTE.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Balance</Text>
+        <Text style={{ ...FONTS.display, fontSize: 17, letterSpacing: -0.5, marginTop: 4, color: (activeStats?.balance ?? 0) >= 0 ? '#2A6E47' : '#B03030' }} numberOfLines={1}>
+          {formatARS(activeStats?.balance ?? 0, { showSign: true })}
+        </Text>
+      </View>
+    </View>
+  );
+
+  const DonutCard = ({ cardWidth }) => (
+    donutData.length > 0 ? (
+      <View style={[cardStyle, cardWidth && { flex: 1 }]}>
+        <Text style={{ ...FONTS.display, fontSize: 15, color: PALETTE.ink, marginBottom: 12 }}>Distribución</Text>
+        <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+          <DonutChart data={donutData} size={isDesktop ? 160 : 140} thickness={isDesktop ? 24 : 20} />
+          <View style={{ flex: 1, gap: 8 }}>
+            {donutData.slice(0, isDesktop ? 6 : 4).map(d => {
+              const pct = (activeStats?.totalGastos ?? 0) > 0
+                ? Math.round((d.value / activeStats.totalGastos) * 100)
+                : 0;
+              return (
+                <View key={d.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: d.color }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: PALETTE.ink }}>{d.label}</Text>
+                    <Text style={{ fontSize: 10, color: PALETTE.muted }}>
+                      {pct}% · {formatARS(d.value, { compact: true })}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      </View>
+    ) : null
+  );
+
+  const BarCard = ({ cardWidth }) => (
+    <View style={[cardStyle, cardWidth && { flex: 1 }]}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 18 }}>
+        <Text style={{ ...FONTS.display, fontSize: 15, color: PALETTE.ink }}>
+          {isCurrentMonth ? 'Últimos 7 días' : 'Por semana'}
+        </Text>
+        <Text style={{ fontSize: 11, color: PALETTE.muted }}>
+          prom. {formatARS(Math.round(avgDaily), { compact: true })}/día
+        </Text>
+      </View>
+      {barsHasData
+        ? <BarChart data={barsData} accent={PALETTE.accent} height={isDesktop ? 160 : 120} />
+        : <View style={{ paddingVertical: 28, alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, color: PALETTE.muted }}>Sin gastos en este período</Text>
+          </View>
+      }
+    </View>
+  );
+
+  const LineCard = () => (
+    <View style={cardStyle}>
+      <Text style={{ ...FONTS.display, fontSize: 15, color: PALETTE.ink, marginBottom: 12 }}>
+        Acumulado del mes
+      </Text>
+      <LineChart
+        data={lineData}
+        width={Math.max(lineChartWidth, 200)}
+        height={isDesktop ? 130 : 100}
+        accent={PALETTE.accent}
+      />
+    </View>
+  );
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: PALETTE.bg }}
-      contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 18, paddingBottom: 100 }}
+      contentContainerStyle={{ paddingTop: topPad, paddingHorizontal: hPad, paddingBottom: botPad }}
       showsVerticalScrollIndicator={false}
     >
-      {/* Header */}
-      <View style={{ marginBottom: 14, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-        <View>
-          <Text style={{ fontSize: 12, color: PALETTE.muted, letterSpacing: 0.4, textTransform: 'uppercase', fontWeight: '600' }}>
-            Análisis
-          </Text>
-          <Text style={{ ...FONTS.display, fontSize: 28, color: PALETTE.ink, letterSpacing: -0.6, marginTop: 2 }}>
-            Reportes
-          </Text>
-        </View>
-        <Pressable
-          onPress={exportPDF}
-          disabled={exporting}
-          style={({ pressed }) => ({
-            flexDirection: 'row', alignItems: 'center', gap: 6,
-            paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12,
-            backgroundColor: pressed ? 'rgba(46,36,56,0.1)' : PALETTE.card,
-            borderWidth: 1, borderColor: 'rgba(46,36,56,0.1)',
-            opacity: exporting ? 0.6 : 1,
-            shadowColor: PALETTE.ink, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1,
-          })}
-        >
-          {exporting
-            ? <ActivityIndicator size="small" color={PALETTE.ink} />
-            : <Text style={{ fontSize: 14 }}>📄</Text>
-          }
-          <Text style={{ fontSize: 12, fontWeight: '600', color: PALETTE.ink }}>
-            {exporting ? 'Exportando…' : 'Exportar PDF'}
-          </Text>
-        </Pressable>
-      </View>
-
-      {/* Month navigator */}
-      <View style={{
-        flexDirection: 'row', alignItems: 'center',
-        backgroundColor: 'rgba(46,36,56,0.06)', borderRadius: 16, padding: 4, marginBottom: 16,
-      }}>
-        <Pressable
-          onPress={prevMonth}
-          style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 12 }}
-        >
-          <Text style={{ fontSize: 22, color: PALETTE.ink, lineHeight: 28 }}>‹</Text>
-        </Pressable>
-        <View style={{ flex: 1, alignItems: 'center' }}>
-          <Text style={{ ...FONTS.bodySemiBold, fontSize: 14, color: PALETTE.ink }}>
-            {MESES[selMonth]} {selYear}
-          </Text>
-        </View>
-        <Pressable
-          onPress={nextMonth}
-          disabled={isCurrentMonth}
-          style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 12, opacity: isCurrentMonth ? 0.25 : 1 }}
-        >
-          <Text style={{ fontSize: 22, color: PALETTE.ink, lineHeight: 28 }}>›</Text>
-        </Pressable>
-      </View>
+      <PageHeader />
+      <MonthNavigator />
 
       {histLoading ? (
         <View style={{ paddingVertical: 60, alignItems: 'center' }}>
           <ActivityIndicator color={PALETTE.ink} />
         </View>
-      ) : (
+      ) : isDesktop ? (
+        /* ── Desktop layout: charts side by side ─────────────────────── */
         <>
-          {/* Summary row */}
-          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
-            <View style={{ flex: 1, backgroundColor: '#ECE6F6', borderRadius: 18, padding: 14 }}>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: PALETTE.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Gastos</Text>
-              <Text style={{ ...FONTS.display, fontSize: 17, color: PALETTE.ink, letterSpacing: -0.5, marginTop: 4 }} numberOfLines={1}>
-                {formatARS(activeStats?.totalGastos ?? 0)}
-              </Text>
-            </View>
-            <View style={{ flex: 1, backgroundColor: '#B8E6C8', borderRadius: 18, padding: 14 }}>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: '#1F3A2C', textTransform: 'uppercase', letterSpacing: 0.5, opacity: 0.7 }}>Ingresos</Text>
-              <Text style={{ ...FONTS.display, fontSize: 17, color: '#1F3A2C', letterSpacing: -0.5, marginTop: 4 }} numberOfLines={1}>
-                {formatARS(activeStats?.totalIngresos ?? 0)}
-              </Text>
-            </View>
-            <View style={{ flex: 1, backgroundColor: PALETTE.card, borderRadius: 18, padding: 14 }}>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: PALETTE.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Balance</Text>
-              <Text style={{ ...FONTS.display, fontSize: 17, letterSpacing: -0.5, marginTop: 4, color: (activeStats?.balance ?? 0) >= 0 ? '#2A6E47' : '#B03030' }} numberOfLines={1}>
-                {formatARS(activeStats?.balance ?? 0, { showSign: true })}
-              </Text>
-            </View>
+          <SummaryRow />
+          <View style={{ flexDirection: 'row', gap: 14, marginBottom: 0 }}>
+            <DonutCard cardWidth />
+            <BarCard cardWidth />
           </View>
-
-          {/* Donut card */}
-          {donutData.length > 0 && (
-            <View style={cardStyle}>
-              <Text style={{ ...FONTS.display, fontSize: 15, color: PALETTE.ink, marginBottom: 12 }}>Distribución</Text>
-              <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
-                <DonutChart data={donutData} size={140} thickness={20} />
-                <View style={{ flex: 1, gap: 8 }}>
-                  {donutData.slice(0, 4).map(d => {
-                    const pct = (activeStats?.totalGastos ?? 0) > 0
-                      ? Math.round((d.value / activeStats.totalGastos) * 100)
-                      : 0;
-                    return (
-                      <View key={d.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: d.color }} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: PALETTE.ink }}>{d.label}</Text>
-                          <Text style={{ fontSize: 10, color: PALETTE.muted }}>
-                            {pct}% · {formatARS(d.value, { compact: true })}
-                          </Text>
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* Bar chart card */}
-          <View style={cardStyle}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 18 }}>
-              <Text style={{ ...FONTS.display, fontSize: 15, color: PALETTE.ink }}>
-                {isCurrentMonth ? 'Últimos 7 días' : 'Por semana'}
-              </Text>
-              <Text style={{ fontSize: 11, color: PALETTE.muted }}>
-                prom. {formatARS(Math.round(avgDaily), { compact: true })}/día
-              </Text>
-            </View>
-            {barsHasData
-              ? <BarChart data={barsData} accent={PALETTE.accent} />
-              : <View style={{ paddingVertical: 28, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 13, color: PALETTE.muted }}>Sin gastos en este período</Text>
-                </View>
-            }
-          </View>
-
-          {/* Line chart card */}
-          <View style={cardStyle}>
-            <Text style={{ ...FONTS.display, fontSize: 15, color: PALETTE.ink, marginBottom: 12 }}>
-              Acumulado del mes
-            </Text>
-            <LineChart data={lineData} width={300} height={100} accent={PALETTE.accent} />
-          </View>
+          <LineCard />
+        </>
+      ) : (
+        /* ── Mobile layout: stacked ───────────────────────────────────── */
+        <>
+          <SummaryRow />
+          <DonutCard />
+          <BarCard />
+          <LineCard />
         </>
       )}
     </ScrollView>

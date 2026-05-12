@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONTS, PALETTE } from '../constants/theme';
+import { useLayout } from '../hooks/useLayout';
+import Sidebar from '../components/desktop/Sidebar';
+import { SidebarProvider } from '../context/SidebarContext';
 import DashboardScreen from '../screens/DashboardScreen';
 import ExpensesScreen from '../screens/ExpensesScreen';
 import NuevoScreen from '../screens/NuevoScreen';
@@ -33,7 +36,7 @@ const TABS = [
   { name: 'Perfil',   icon: 'person', route: 'Perfil'   },
 ];
 
-function CustomTabBar({ state, navigation }) {
+function MobileTabBar({ state, navigation }) {
   const insets = useSafeAreaInsets();
   const routeNames = state.routes.map(r => r.name);
 
@@ -48,7 +51,6 @@ function CustomTabBar({ state, navigation }) {
         {TABS.map((item) => {
           const routeIndex = routeNames.indexOf(item.route);
           const active = state.index === routeIndex;
-
           return (
             <Pressable
               key={item.name}
@@ -71,14 +73,41 @@ function CustomTabBar({ state, navigation }) {
   );
 }
 
+// Renders nothing — bridges Tab.Navigator navigation state to the desktop sidebar
+function DesktopTabBarBridge({ state, navigation, onUpdate }) {
+  const activeRoute = state.routes[state.index]?.name ?? 'Inicio';
+  React.useEffect(() => {
+    onUpdate(activeRoute, navigation.navigate);
+  }, [activeRoute]);
+  return null;
+}
+
 const Tab = createBottomTabNavigator();
 
-export default function TabNavigator() {
-  return (
-    <Tab.Navigator
-      tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
-    >
+function TabNavigatorInner() {
+  const { isDesktop } = useLayout();
+
+  // navigate is stored in a ref (stable, no re-render needed when it changes)
+  const navigateFnRef = useRef(() => {});
+  const [activeRoute, setActiveRoute] = useState('Inicio');
+
+  const handleBridgeUpdate = useCallback((route, navigateFn) => {
+    navigateFnRef.current = navigateFn;
+    setActiveRoute(route);
+  }, []);
+
+  // Stable navigate wrapper so Sidebar doesn't recreate on every render
+  const sidebarNavigate = useCallback((name) => {
+    navigateFnRef.current(name);
+  }, []);
+
+  const tabBar = useCallback((props) => {
+    if (!isDesktop) return <MobileTabBar {...props} />;
+    return <DesktopTabBarBridge {...props} onUpdate={handleBridgeUpdate} />;
+  }, [isDesktop, handleBridgeUpdate]);
+
+  const screens = (
+    <Tab.Navigator tabBar={tabBar} screenOptions={{ headerShown: false }}>
       <Tab.Screen name="Inicio"    component={DashboardScreen} />
       <Tab.Screen name="Gastos"    component={ExpensesScreen}  />
       <Tab.Screen name="Nuevo"     component={NuevoScreen}     />
@@ -86,5 +115,27 @@ export default function TabNavigator() {
       <Tab.Screen name="Reportes"  component={ReportsScreen}   />
       <Tab.Screen name="Perfil"    component={ProfileScreen}   />
     </Tab.Navigator>
+  );
+
+  if (isDesktop) {
+    return (
+      <View style={{ flex: 1, flexDirection: 'row' }}>
+        {/* Sidebar is a normal flex child — no position:absolute, no overlap */}
+        <Sidebar navigate={sidebarNavigate} activeRoute={activeRoute} />
+        <View style={{ flex: 1, backgroundColor: PALETTE.bg }}>
+          {screens}
+        </View>
+      </View>
+    );
+  }
+
+  return screens;
+}
+
+export default function TabNavigator() {
+  return (
+    <SidebarProvider>
+      <TabNavigatorInner />
+    </SidebarProvider>
   );
 }

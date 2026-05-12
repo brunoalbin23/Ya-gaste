@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { PALETTE, FONTS } from '../constants/theme';
+import { useLayout } from '../hooks/useLayout';
 
 function Avatar({ nombre, size = 40 }: { nombre: string; size?: number }) {
   const initial = nombre?.charAt(0)?.toUpperCase() ?? '?';
@@ -130,6 +131,7 @@ function FamiliaSetup() {
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const { isDesktop } = useLayout();
   const { signOut } = useAuth();
   const { profile, familia, familiaMembers, updateNombre, joinFamilia, leaveFamilia } = useData();
 
@@ -203,7 +205,7 @@ export default function ProfileScreen() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: PALETTE.bg }}
-      contentContainerStyle={[s.container, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 100 }]}
+      contentContainerStyle={[s.container, { paddingTop: isDesktop ? 32 : insets.top + 8, paddingBottom: isDesktop ? 40 : insets.bottom + 100 }]}
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}

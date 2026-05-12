@@ -3,7 +3,7 @@ import {
   View, Text, TextInput, Pressable, ActivityIndicator,
   ScrollView, Image, Alert,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
+import { pickFromLibrary, pickFromCamera } from '../utils/imagePicker';
 import { FONTS, PALETTE } from '../constants/theme';
 import { useData } from '../context/DataContext';
 import { analyzeText, analyzeImage } from '../services/aiService';
@@ -199,39 +199,13 @@ export default function AIExpenseSheet() {
 
   async function pickImage(fromCamera) {
     try {
-      let result;
-      if (fromCamera) {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permiso necesario', 'Necesitamos acceso a la cámara para sacar fotos.');
-          return;
-        }
-        result = await ImagePicker.launchCameraAsync({
-          mediaTypes: 'images',
-          quality: 0.6,
-          base64: true,
-        });
-      } else {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permiso necesario', 'Necesitamos acceso a la galería para seleccionar fotos.');
-          return;
-        }
-        result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: 'images',
-          quality: 0.6,
-          base64: true,
-        });
+      const result = fromCamera ? await pickFromCamera() : await pickFromLibrary();
+      if (result) {
+        setImageUri(result.uri);
+        setImageBase64(result.base64);
+        setImageMediaType(result.mediaType);
       }
-
-      if (!result.canceled && result.assets?.[0]) {
-        const asset = result.assets[0];
-        setImageUri(asset.uri);
-        setImageBase64(asset.base64);
-        const ext = (asset.uri.split('.').pop() ?? 'jpg').toLowerCase();
-        setImageMediaType(ext === 'png' ? 'image/png' : 'image/jpeg');
-      }
-    } catch (e) {
+    } catch {
       Alert.alert('Error', 'No se pudo acceder a la cámara/galería.');
     }
   }
